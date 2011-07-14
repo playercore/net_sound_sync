@@ -289,7 +289,10 @@ HRESULT CRealSourceFilter::GetCurrentNeedSendDataNumbers(int64* numbers)
 bool CRealSourceFilter::StartListenerThread()
 {
     if (!m_listenerThread.IsRunning())
+    {
+        m_isListenerThreadStopped = false;
         m_listenerThread.Start();
+    }
 
     m_listenerThread.message_loop()->PostTask(
         FROM_HERE, NewRunnableMethod(this, 
@@ -311,10 +314,58 @@ void CRealSourceFilter::checkBufferState()
     CAutoLock lock(m_pLock);
     OAFilterState filterState;
     mediaControl->GetState(INFINITE , &filterState);
-    if ((m_stateInfo->currentNeedSendPackets > 200) 
-        && ((State_Paused == filterState) || (State_Stopped == filterState)))
+    if ((m_stateInfo->currentNeedSendPackets > 0) && 
+        (m_stateInfo->currentBufferPackets < 200))
     {
-            mediaControl->Run();
+        if (State_Paused != filterState)
+            mediaControl->Pause();
+
+        Sleep(1000);
+        m_listenerThread.message_loop()->PostTask(
+            FROM_HERE, 
+            NewRunnableMethod(this, &CRealSourceFilter::checkBufferState));
+    }
+    else if (m_stateInfo->currentBufferPackets > 200)
+    {
+        intrusive_ptr<IReferenceClock> referenceClock;
+        HRESULT hr = m_pGraph->QueryInterface(
+            IID_IReferenceClock, reinterpret_cast<void**>(&referenceClock));
+        if (SUCCEEDED(hr))
+        {
+            int64 refTime = 0;
+            referenceClock->GetTime(&refTime);
+            char* p = m_buffer.get() + sizeof(WAVEFORMATEX) + 
+                sizeof(ALLOCATOR_PROPERTIES) + 1;
+            TDataPacket* packet = reinterpret_cast<TDataPacket*>(p);
+            int chuckDataSize = 0;
+            int chuckDataNumber = 0;
+            while (packet->beginTime < refTime)
+            {
+                chuckDataSize += sizeof(TDataPacket) + packet->size;
+                char* ptr = reinterpret_cast<char*>(packet);
+                ptr += sizeof(TDataPacket) + packet->size;
+                packet = reinterpret_cast<TDataPacket*>(ptr);
+                ++chuckDataNumber;
+            }
+            if (chuckDataSize > 0)
+            {
+                int copySize = 1024 * 1024 * 40 - chuckDataSize - 
+                    (sizeof(WAVEFORMATEX) + sizeof(ALLOCATOR_PROPERTIES) + 1);
+                CopyMemory(p, p + chuckDataSize, copySize);
+                //TODO:增加丢弃的数据包和数据大小
+                m_stateInfo->currentBufferPackets -= chuckDataNumber;
+                m_stateInfo->currentBufferSize -= chuckDataSize;
+                Sleep(1000);
+                m_listenerThread.message_loop()->PostTask(
+                    FROM_HERE, 
+                    NewRunnableMethod(this, 
+                                      &CRealSourceFilter::checkBufferState));
+            }           
+            else
+            {
+                mediaControl->Run();
+            }
+        }
     }
     else
     {        
@@ -324,6 +375,17 @@ void CRealSourceFilter::checkBufferState()
             NewRunnableMethod(this, &CRealSourceFilter::checkBufferState));
     }
         
+}
+
+HRESULT CRealSourceFilter::Run(int64 start)
+{
+    if (m_listenerThread.IsRunning())
+    {
+        m_isListenerThreadStopped = true;
+        m_listenerThread.Stop();
+    }
+
+    return CSource::Run(start);
 }
 
 STDAPI DllRegisterServer()

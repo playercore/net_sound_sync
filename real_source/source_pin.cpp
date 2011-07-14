@@ -2,13 +2,17 @@
 
 #include "real_source_filter.h"
 #include "../common/debug_util.h"
+#include "../common/intrusive_ptr_helper.h"
 
 #include "types.h"
+
+#include <boost/intrusive_ptr.hpp>
 
 #include "../chromium/base/basictypes.h"
 
 using boost::shared_ptr;
 using boost::shared_array;
+using boost::intrusive_ptr;
 
 CSourcePin::CSourcePin(HRESULT* hr, CRealSourceFilter* sourceFilter, 
                        shared_array<char> buffer,
@@ -20,6 +24,7 @@ CSourcePin::CSourcePin(HRESULT* hr, CRealSourceFilter* sourceFilter,
     , m_buffer(buffer)
     , m_stateInfo(stateInfo)
     , m_ownerFilter(sourceFilter)
+    , m_nextSampleBeginTime(0)
 {
 
 }
@@ -27,51 +32,18 @@ CSourcePin::CSourcePin(HRESULT* hr, CRealSourceFilter* sourceFilter,
 HRESULT CSourcePin::FillBuffer(IMediaSample* sample)
 {
     CAutoLock lock(m_pLock);  
-    bool alreadFilled = false;
-    do {
-        if (m_stateInfo->currentNeedSendPackets <= 0)
-        {
+    HRESULT hr = S_OK;
+    if (!m_ownerFilter->IsListenerThreadStarted())
+    {
+        hr = fillNormalDataInSample(sample);
+        if (S_FALSE == hr)
             m_ownerFilter->StartListenerThread();
-            Sleep(1000);
-            continue;
-        }
-        unsigned char* sampleDataPointer = NULL;
-        HRESULT hr = sample->GetPointer(&sampleDataPointer);
-        if (FAILED(hr))
-            return hr;
-
-        char* dataBeginPtr = m_buffer.get() + sizeof(WAVEFORMATEX) + 
-            sizeof(ALLOCATOR_PROPERTIES) + 1;
-        char* p1 = dataBeginPtr;
-        
-        TDataPacket* dataPacket = reinterpret_cast<TDataPacket*>(p1);        
-        p1 += sizeof(TDataPacket);
-        CopyMemory(sampleDataPointer, p1, dataPacket->size);
-        sample->SetTime(&dataPacket->beginTime, &dataPacket->endTime);
-        sample->SetActualDataLength(dataPacket->size);
-        sample->SetPreroll(false);
-        sample->SetDiscontinuity(true);
-        sample->SetSyncPoint(true);
-        sample->SetMediaTime(NULL, NULL);
-        TRACE(L"beginTime %I64d, endTime: %I64d, size: %d \n", 
-              dataPacket->beginTime, dataPacket->endTime, dataPacket->size); 
-        
-        int packetSize = dataPacket->size + sizeof(TDataPacket);
-        char* pp = dataBeginPtr;
-
-        MoveMemory(pp, pp + packetSize, 1024 * 1024 * 40 - packetSize);
-        
-        ++m_stateInfo->sendPackets;
-        m_stateInfo->sendDatas += dataPacket->size;
-        --m_stateInfo->currentBufferPackets;
-        m_stateInfo->currentBufferSize -= packetSize;
-        m_stateInfo->currentNeedSendBufferSize = m_stateInfo->currentBufferSize;
-        m_stateInfo->currentNeedSendPackets = m_stateInfo->currentBufferPackets;
-
-        alreadFilled = true;
-    } while (!alreadFilled);
-
-    return S_OK;
+    }
+    else
+    { 
+        hr = fillZeroDataInSample(sample);            
+    }
+    return hr;
 }
 
 HRESULT CSourcePin::CheckMediaType(const CMediaType* mediaType)
@@ -139,4 +111,87 @@ HRESULT CSourcePin::CheckConnect(IPin* pin)
 //     m_sourceAllocProperties.cbPrefix = 0;
 //     m_maxSampleSize = 4096;
     return CSourceStream::CheckConnect(pin);
+}
+
+HRESULT CSourcePin::fillNormalDataInSample(IMediaSample* sample)
+{
+    if (m_stateInfo->currentNeedSendPackets <= 0)
+        return S_FALSE;
+
+    unsigned char* sampleDataPointer = NULL;
+    HRESULT hr = sample->GetPointer(&sampleDataPointer);
+    if (FAILED(hr))
+        return hr;
+
+    char* dataBeginPtr = m_buffer.get() + sizeof(WAVEFORMATEX) + 
+        sizeof(ALLOCATOR_PROPERTIES) + 1;
+    char* p1 = dataBeginPtr;
+
+    TDataPacket* dataPacket = reinterpret_cast<TDataPacket*>(p1);        
+    p1 += sizeof(TDataPacket);
+    CopyMemory(sampleDataPointer, p1, dataPacket->size);
+    sample->SetTime(&dataPacket->beginTime, &dataPacket->endTime);
+    sample->SetActualDataLength(dataPacket->size);
+    sample->SetPreroll(false);
+    sample->SetDiscontinuity(true);
+    sample->SetSyncPoint(true);
+    sample->SetMediaTime(NULL, NULL);
+    TRACE(L"beginTime %I64d, endTime: %I64d, size: %d \n", 
+        dataPacket->beginTime, dataPacket->endTime, dataPacket->size); 
+
+    int packetSize = dataPacket->size + sizeof(TDataPacket);
+    char* pp = dataBeginPtr;
+
+    MoveMemory(pp, pp + packetSize, 1024 * 1024 * 40 - packetSize);
+
+    ++m_stateInfo->sendPackets;
+    m_stateInfo->sendDatas += dataPacket->size;
+    --m_stateInfo->currentBufferPackets;
+    m_stateInfo->currentBufferSize -= packetSize;
+    m_stateInfo->currentNeedSendBufferSize = m_stateInfo->currentBufferSize;
+    m_stateInfo->currentNeedSendPackets = m_stateInfo->currentBufferPackets;
+    m_nextSampleBeginTime = dataPacket->endTime;
+    return S_OK;
+}
+
+HRESULT CSourcePin::fillZeroDataInSample(IMediaSample* sample)
+{
+    uint8* p = NULL;
+    HRESULT hr = sample->GetPointer(&p);
+    if (FAILED(hr))
+        return hr;
+
+    memset(p, 0, m_sourceAllocProperties.cbBuffer);
+    int64 durationTime = m_sourceAllocProperties.cbBuffer * UNITS / 
+        (m_sourceWaveFormat.wBitsPerSample >> 3) / m_sourceWaveFormat.nChannels 
+        / m_sourceWaveFormat.nSamplesPerSec;
+    int64 endTime = m_nextSampleBeginTime + durationTime;
+    sample->SetActualDataLength(m_sourceAllocProperties.cbBuffer);
+    sample->SetTime(&m_nextSampleBeginTime, &endTime);
+    sample->SetPreroll(false);
+    sample->SetDiscontinuity(true);
+    sample->SetSyncPoint(true);
+    sample->SetMediaTime(NULL, NULL);
+    m_nextSampleBeginTime = endTime;
+    return S_OK;
+}
+
+HRESULT CSourcePin::Run()
+{
+    intrusive_ptr<IPin> inputPin;
+    HRESULT hr = m_pInputPin->QueryInterface(
+        IID_IPin, reinterpret_cast<void**>(&inputPin));
+
+    if (FAILED(hr))
+        return hr;
+
+    hr = inputPin->BeginFlush();
+    if (FAILED(hr))
+        return hr;
+
+    hr = inputPin->EndFlush();
+    if (FAILED(hr))
+        return hr;
+
+    return CSourceStream::Run();
 }

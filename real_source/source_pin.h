@@ -6,6 +6,7 @@
 #include <string>
 #include "boost/shared_array.hpp"
 #include <boost/shared_ptr.hpp>
+#include "../chromium/base/basictypes.h"
 
 class CRealSourceFilter;
 struct TReceiveFilterStateInfo;
@@ -23,6 +24,7 @@ public:
     virtual HRESULT DecideBufferSize(IMemAllocator* alloc, 
                                      ALLOCATOR_PROPERTIES* propInputRequest);
     virtual HRESULT CheckConnect(IPin* pin);
+    virtual HRESULT Run();
 
 private:
     WAVEFORMATEX m_sourceWaveFormat;
@@ -31,6 +33,10 @@ private:
     boost::shared_array<char> m_buffer;
     boost::shared_ptr<TReceiveFilterStateInfo> m_stateInfo;
     CRealSourceFilter* m_ownerFilter;
+    int64 m_nextSampleBeginTime;
+
+    HRESULT fillNormalDataInSample(IMediaSample* sample);
+    HRESULT fillZeroDataInSample(IMediaSample* sample);
 };
 
 #endif
