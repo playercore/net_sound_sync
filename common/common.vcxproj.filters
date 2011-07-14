@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="debug_util.cpp" />
+    <ClCompile Include="listener.cpp" />
+    <ClCompile Include="net_sock.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="debug_util.h" />
+    <ClInclude Include="intrusive_ptr_helper.h" />
+    <ClInclude Include="listener.h" />
+    <ClInclude Include="net_sock.h" />
+  </ItemGroup>
+</Project>

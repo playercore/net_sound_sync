@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "common", "common\common.vcxproj", "{CBCCBB7B-385F-4828-806C-68439D5E346C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chromium", "chromium\Chromium.vcxproj", "{FBC684D0-36B4-4A99-92B5-259F1AA9EC40}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "net_send_data", "net_send_data\net_send_data.vcxproj", "{5198C3A4-3F0C-4FB3-9E48-B8302B4272D6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "real_source", "real_source\memory_real_source.vcxproj", "{B864F500-90FC-4DE8-B5EA-1F1E0A0650A0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CBCCBB7B-385F-4828-806C-68439D5E346C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CBCCBB7B-385F-4828-806C-68439D5E346C}.Debug|Win32.Build.0 = Debug|Win32
+		{CBCCBB7B-385F-4828-806C-68439D5E346C}.Release|Win32.ActiveCfg = Release|Win32
+		{CBCCBB7B-385F-4828-806C-68439D5E346C}.Release|Win32.Build.0 = Release|Win32
+		{FBC684D0-36B4-4A99-92B5-259F1AA9EC40}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FBC684D0-36B4-4A99-92B5-259F1AA9EC40}.Debug|Win32.Build.0 = Debug|Win32
+		{FBC684D0-36B4-4A99-92B5-259F1AA9EC40}.Release|Win32.ActiveCfg = Release|Win32
+		{FBC684D0-36B4-4A99-92B5-259F1AA9EC40}.Release|Win32.Build.0 = Release|Win32
+		{5198C3A4-3F0C-4FB3-9E48-B8302B4272D6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5198C3A4-3F0C-4FB3-9E48-B8302B4272D6}.Debug|Win32.Build.0 = Debug|Win32
+		{5198C3A4-3F0C-4FB3-9E48-B8302B4272D6}.Release|Win32.ActiveCfg = Release|Win32
+		{5198C3A4-3F0C-4FB3-9E48-B8302B4272D6}.Release|Win32.Build.0 = Release|Win32
+		{B864F500-90FC-4DE8-B5EA-1F1E0A0650A0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{B864F500-90FC-4DE8-B5EA-1F1E0A0650A0}.Debug|Win32.Build.0 = Debug|Win32
+		{B864F500-90FC-4DE8-B5EA-1F1E0A0650A0}.Release|Win32.ActiveCfg = Release|Win32
+		{B864F500-90FC-4DE8-B5EA-1F1E0A0650A0}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

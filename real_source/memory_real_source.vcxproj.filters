@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="source_pin.h" />
+    <ClInclude Include="real_source_filter.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="property_page.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source_pin.cpp" />
+    <ClCompile Include="real_source_filter.cpp" />
+    <ClCompile Include="property_page.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="real_source.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="form_resource.rc" />
+  </ItemGroup>
+</Project>
