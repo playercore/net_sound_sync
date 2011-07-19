@@ -90,6 +90,7 @@ CRealSourceFilter::CRealSourceFilter(IUnknown* unk, HRESULT* hr)
     , m_stateInfo(new TReceiveFilterStateInfo())
     , m_listenerThread("listener thread")
     , m_isListenerThreadStopped(false)
+    , m_canStopListenThread(false)
 {
     memset(m_buffer.get(), 0, m_bufferSize);
     memset(m_stateInfo.get(), 0, sizeof(TReceiveFilterStateInfo));
@@ -327,19 +328,22 @@ void CRealSourceFilter::checkBufferState()
     }
     else if (m_stateInfo->currentBufferPackets > 200)
     {
-        intrusive_ptr<IReferenceClock> referenceClock;
+        intrusive_ptr<IMediaSeeking> mediaSeeking;
         HRESULT hr = m_pGraph->QueryInterface(
-            IID_IReferenceClock, reinterpret_cast<void**>(&referenceClock));
+            IID_IMediaSeeking, reinterpret_cast<void**>(&mediaSeeking));
         if (SUCCEEDED(hr))
         {
-            int64 refTime = 0;
-            referenceClock->GetTime(&refTime);
-            char* p = m_buffer.get() + sizeof(WAVEFORMATEX) + 
+            int64 currentTime = 0;
+            int64 totalTime = 0;
+            mediaSeeking->GetPositions(&currentTime, &totalTime);
+            const int headSize = sizeof(WAVEFORMATEX) + 
                 sizeof(ALLOCATOR_PROPERTIES) + 1;
+            char* p = m_buffer.get() + headSize;
             TDataPacket* packet = reinterpret_cast<TDataPacket*>(p);
             int chuckDataSize = 0;
             int chuckDataNumber = 0;
-            while (packet->beginTime < refTime)
+            while ((packet->beginTime < currentTime) && 
+                   (chuckDataNumber < m_stateInfo->currentNeedSendPackets))
             {
                 chuckDataSize += sizeof(TDataPacket) + packet->size;
                 char* ptr = reinterpret_cast<char*>(packet);
@@ -349,12 +353,12 @@ void CRealSourceFilter::checkBufferState()
             }
             if (chuckDataSize > 0)
             {
-                int copySize = 1024 * 1024 * 40 - chuckDataSize - 
-                    (sizeof(WAVEFORMATEX) + sizeof(ALLOCATOR_PROPERTIES) + 1);
+                int copySize = 1024 * 1024 * 40 - chuckDataSize - headSize;
                 CopyMemory(p, p + chuckDataSize, copySize);
                 //TODO:增加丢弃的数据包和数据大小
                 m_stateInfo->currentBufferPackets -= chuckDataNumber;
                 m_stateInfo->currentBufferSize -= chuckDataSize;
+                memset(p + copySize, 0, 1024 * 1024 * 40 - copySize - headSize);
                 Sleep(1000);
                 m_listenerThread.message_loop()->PostTask(
                     FROM_HERE, 
@@ -363,6 +367,7 @@ void CRealSourceFilter::checkBufferState()
             }           
             else
             {
+                m_canStopListenThread = true;
                 mediaControl->Run();
             }
         }
@@ -377,15 +382,15 @@ void CRealSourceFilter::checkBufferState()
         
 }
 
-HRESULT CRealSourceFilter::Run(int64 start)
+bool CRealSourceFilter::StopListenerThread()
 {
     if (m_listenerThread.IsRunning())
     {
+        m_canStopListenThread = false;
         m_isListenerThreadStopped = true;
         m_listenerThread.Stop();
     }
-
-    return CSource::Run(start);
+    return true;
 }
 
 STDAPI DllRegisterServer()

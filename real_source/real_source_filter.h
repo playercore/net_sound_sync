@@ -75,7 +75,6 @@ public:
     static CUnknown* __stdcall CreateInstance(IUnknown* unk, HRESULT* hr);
     virtual HRESULT __stdcall NonDelegatingQueryInterface(const GUID& iid, 
                                                           void** v);
-    virtual HRESULT __stdcall Run(int64 start);
     //ISocketConnect interface
     virtual HRESULT __stdcall SetIPAddress(const wchar_t* ipAddress);
     virtual HRESULT __stdcall GetIPAddress(wchar_t* ipAddress);
@@ -98,7 +97,9 @@ public:
     virtual HRESULT __stdcall GetPages(CAUUID* pages);
 
     bool StartListenerThread();
+    bool StopListenerThread();
     bool IsListenerThreadStarted() { return m_listenerThread.IsRunning(); }
+    bool CanStopListenerThread() { return m_canStopListenThread; }
 
 private:
     const static int m_bufferSize = 1024 * 1024 * 40;
@@ -112,7 +113,8 @@ private:
     CSourcePin m_sourcePin;
     std::wstring m_ipAddress;
     int m_port;
-    KConnectState m_connectState;    
+    KConnectState m_connectState;
+    bool m_canStopListenThread;
     void receiveNetData();
     void checkBufferState();
 };

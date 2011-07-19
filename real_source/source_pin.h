@@ -24,9 +24,10 @@ public:
     virtual HRESULT DecideBufferSize(IMemAllocator* alloc, 
                                      ALLOCATOR_PROPERTIES* propInputRequest);
     virtual HRESULT CheckConnect(IPin* pin);
-    virtual HRESULT Run();
 
 private:
+    enum KFillState {FILL_ZERO_DATA, FILL_NORMAL_DATA};
+
     WAVEFORMATEX m_sourceWaveFormat;
     ALLOCATOR_PROPERTIES m_sourceAllocProperties;
     int m_maxSampleSize;
@@ -34,7 +35,8 @@ private:
     boost::shared_ptr<TReceiveFilterStateInfo> m_stateInfo;
     CRealSourceFilter* m_ownerFilter;
     int64 m_nextSampleBeginTime;
-
+    KFillState m_fillState;
+    
     HRESULT fillNormalDataInSample(IMediaSample* sample);
     HRESULT fillZeroDataInSample(IMediaSample* sample);
 };
